@@ -9,7 +9,15 @@ class Trader:
     
     def run(self, state: TradingState):
         """Only method required. It takes all buy and sell orders for all
-        symbols as an input, and outputs a list of orders to be sent."""
+        symbols as an input, and outputs a list of orders to be sent.
+        
+        After performing logic on the incoming order state, the run method defined 
+        by the player should output a dictionary containing the orders that the 
+        algorithm wants to send. The keys of this dictionary should be all the 
+        products that the algorithm wishes to send orders for. 
+        
+        These orders should be instances of the Order class. 
+        """
 
         print("traderData: " + state.traderData)
         print("Observations: " + str(state.observations))
