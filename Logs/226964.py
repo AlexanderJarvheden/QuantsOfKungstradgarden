@@ -5,20 +5,17 @@ import json
 
 class Trader:
     """
-    Round 1 strategy informed by both price CSVs and trade CSVs.
+    Round 1 strategy for ASH_COATED_OSMIUM and INTARIAN_PEPPER_ROOT.
 
-    PRICE DATA findings:
-      - ASH_COATED_OSMIUM: stationary ~10 000, std ≈ 5, autocorr ≈ −0.50
-      - INTARIAN_PEPPER_ROOT: uptrend ~1 000/day, intraday std ≈ 289
+    ASH_COATED_OSMIUM  – stationary around 10 000, std ≈ 5, strong negative
+    lag-1 autocorrelation (≈ −0.50).  Ideal for market making with inventory
+    skew: post tight quotes inside the spread and let mean reversion drive
+    round-trip profits.
 
-    TRADE DATA findings:
-      - All bot trades happen at bid/ask levels (offset ±8 for ASH, ±6 for
-        PEPPER), never inside the spread.  Our inside-spread quotes attract
-        bots to better prices.
-      - ASH flow signal is noise (corr ≈ 0.05, decays to 0 by 5 ticks).
-      - PEPPER has strong momentum: net buy flow predicts +2.06 future
-        return, net sell flow predicts −0.76 (corr ≈ 0.38, persists 10 ticks).
-        Used to adjust passive buy aggressiveness during accumulation.
+    INTARIAN_PEPPER_ROOT – consistent uptrend of ≈ 1 000 per day (≈ 0.1 per
+    tick).  Trend profit dwarfs the ≈ 13 half-spread cost, so the strategy
+    aggressively accumulates a max-long position and holds it, selling only
+    on short-term overshoots to capture additional mean-reversion alpha.
     """
 
     LIMITS: Dict[str, int] = {
@@ -44,12 +41,10 @@ class Trader:
             pos = state.position.get(product, 0)
             limit = self.LIMITS.get(product, 80)
 
-            market_trades = state.market_trades.get(product, []) if state.market_trades else []
-
             if product == "ASH_COATED_OSMIUM":
                 result[product] = self._trade_osmium(od, pos, limit, trader_state)
             elif product == "INTARIAN_PEPPER_ROOT":
-                result[product] = self._trade_pepper(od, pos, limit, trader_state, market_trades)
+                result[product] = self._trade_pepper(od, pos, limit, trader_state)
             else:
                 result[product] = []
 
@@ -78,11 +73,6 @@ class Trader:
         limit: int,
         ts: dict,
     ) -> List[Order]:
-        """
-        Trade data confirms ASH flow signal is noise (corr 0.05), so no
-        flow adjustment here.  Keep the proven ±2 spread (most fills at
-        fair+2 to fair+4 in v1 logs) with stronger skew for inventory mgmt.
-        """
         orders: List[Order] = []
         mid = self._mid(od)
         if mid is None:
@@ -112,7 +102,8 @@ class Trader:
                     sell_cap -= qty
 
         # --- passive layer: post quotes inside the spread ------------------
-        skew = round(pos / limit * 5)
+        # Inventory skew shifts both prices to encourage position unwind.
+        skew = round(pos / limit * 3)
 
         buy_price = int(fair - 2 - skew)
         sell_price = int(fair + 2 - skew)
@@ -125,7 +116,7 @@ class Trader:
         return orders
 
     # ------------------------------------------------------------------
-    # INTARIAN_PEPPER_ROOT  –  trend following with momentum signal
+    # INTARIAN_PEPPER_ROOT  –  trend following
     # ------------------------------------------------------------------
 
     def _trade_pepper(
@@ -134,13 +125,7 @@ class Trader:
         pos: int,
         limit: int,
         ts: dict,
-        market_trades: list,
     ) -> List[Order]:
-        """
-        Trade data reveals strong momentum signal (corr ≈ 0.38):
-        positive net flow → expected +2.06 return, negative → −0.76.
-        Used to adjust passive buy price during accumulation phase.
-        """
         orders: List[Order] = []
         mid = self._mid(od)
         if mid is None:
@@ -151,21 +136,11 @@ class Trader:
         ts["ip"] = ema
         fair = round(ema)
 
-        # --- momentum signal from bot trades (corr ≈ 0.38) ----------------
-        current_flow = 0
-        for trade in market_trades:
-            if trade.price > mid:
-                current_flow += trade.quantity
-            elif trade.price < mid:
-                current_flow -= trade.quantity
-
-        prev_flow = ts.get("ip_flow", 0.0)
-        flow = 0.5 * prev_flow + 0.5 * current_flow
-        ts["ip_flow"] = flow
-
         buy_cap = limit - pos
+        sell_cap = limit + pos
 
         # --- aggressive buy: take every available ask ----------------------
+        # Trend profit (~1 000/day) vastly exceeds any spread cost (~8).
         for ask in sorted(od.sell_orders):
             if buy_cap > 0:
                 qty = min(-od.sell_orders[ask], buy_cap)
@@ -173,16 +148,24 @@ class Trader:
                     orders.append(Order("INTARIAN_PEPPER_ROOT", ask, qty))
                     buy_cap -= qty
 
-        # --- passive buy: price adjusted by momentum -----------------------
-        # Positive flow → price rising, pay more to accumulate faster.
-        # Negative flow → price dipping, lower bid to get cheaper entry.
+        # --- sell only on significant overshoot ----------------------------
+        for bid in sorted(od.buy_orders, reverse=True):
+            if bid > fair + 3 and sell_cap > 0:
+                qty = min(od.buy_orders[bid], sell_cap)
+                if qty > 0:
+                    orders.append(Order("INTARIAN_PEPPER_ROOT", bid, -qty))
+                    sell_cap -= qty
+
+        # --- passive buy to keep accumulating ------------------------------
         if buy_cap > 0:
-            if flow > 0:
-                passive_price = int(fair + 1)
-            elif flow < 0:
-                passive_price = int(fair - 2)
-            else:
-                passive_price = int(fair)
-            orders.append(Order("INTARIAN_PEPPER_ROOT", passive_price, buy_cap))
+            orders.append(Order("INTARIAN_PEPPER_ROOT", int(fair), buy_cap))
+
+        # --- light passive sell at premium when heavily long ---------------
+        if pos > 40 and sell_cap > 0:
+            sell_qty = min(sell_cap, pos - 30)
+            if sell_qty > 0:
+                orders.append(
+                    Order("INTARIAN_PEPPER_ROOT", int(fair + 5), -sell_qty)
+                )
 
         return orders
