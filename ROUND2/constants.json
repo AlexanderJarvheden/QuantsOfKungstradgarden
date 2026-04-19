@@ -1,0 +1,15 @@
+{
+    "ASH_COATED_OSMIUM": {
+        "rolling_volatility_20": 2.516812368571688,
+        "median_obi_at_extremes": 0.8666666666666667,
+        "avg_markout_small_trades": -0.10190703218116806,
+        "avg_markout_large_trades": -0.18884892086330934
+    },
+    "INTARIAN_PEPPER_ROOT": {
+        "flow_percentile_75": 7.0,
+        "flow_percentile_90": 7.0,
+        "flow_percentile_95": 8.0,
+        "median_micro_retracement": 5.0,
+        "avg_sweep_slippage_80": 8.331737636591397
+    }
+}
