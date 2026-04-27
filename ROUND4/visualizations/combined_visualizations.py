@@ -290,7 +290,7 @@ if __name__ == "__main__":
         for i, (title, desc, fig) in enumerate(figs):
             include_js = 'cdn' if i == 0 else False
             html_content += f"<h2>{title}</h2><p class='desc'>{desc}</p>"
-            html_content += fig.to_html(full_html=False, include_plotlyjs=include_js)
+            html_content += fig.to_html(full_html=False, include_plotlyjs=include_js, config={'scrollZoom': True})
             
         html_content += "</body></html>"
         

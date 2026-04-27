@@ -1,0 +1,9 @@
+{
+    "decay_factor": 0.853,
+    "toxicity_multiplier": 0.014,
+    "skew_multiplier": 6.03,
+    "skew_power": 3.05,
+    "scratch_threshold": 0.67,
+    "option_transaction_costs": 1.35,
+    "annualized_vol": 2.53
+}
