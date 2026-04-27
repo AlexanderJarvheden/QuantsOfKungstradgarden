@@ -241,7 +241,11 @@ if __name__ == "__main__":
         print("Generating Arbitrage View...")
         fig_arb = get_arbitrage_view_fig(prices)
         if fig_arb:
-            figs.append(fig_arb)
+            figs.append((
+                "Arbitrage View",
+                "This graph visualizes the price of the underlying asset (VELVETFRUIT_EXTRACT) alongside the intrinsic value and market price of a sample voucher (VEV). The bottom subplot displays the Implied Volatility (IV) surface derived from the Black-Scholes model for various strike prices at the last available timestamp, helping identify potential mispricings.",
+                fig_arb
+            ))
             
         velvet_trades = trades[trades['symbol'] == 'VELVETFRUIT_EXTRACT']
         sample_traders = velvet_trades['buyer'].dropna().unique()
@@ -253,12 +257,20 @@ if __name__ == "__main__":
             # Alpha profile
             fig_alpha = get_trader_alpha_profile_fig(trades, prices, target_trader)
             if fig_alpha:
-                figs.append(fig_alpha)
+                figs.append((
+                    "Trader Alpha Profile",
+                    f"This graph shows the alpha profile for trader {target_trader}. It plots the price of the target asset over time, overlaying the specific buy and sell executions made by the trader. This allows visualization of the trader's entry and exit points relative to the market price movements.",
+                    fig_alpha
+                ))
                 
             # Inventory risk
             fig_inv = get_inventory_and_pnl_fig(trades, prices, target_trader)
             if fig_inv:
-                figs.append(fig_inv)
+                figs.append((
+                    "Inventory Risk and PnL",
+                    f"This graph tracks the net position (inventory) and the cumulative Profit and Loss (PnL) for trader {target_trader} over time. The net position helps visualize the risk exposure, while the PnL line shows the trader's financial performance resulting from their trades and the asset's price changes.",
+                    fig_inv
+                ))
         else:
             print("No traders found for VELVETFRUIT_EXTRACT.")
             
@@ -271,10 +283,13 @@ if __name__ == "__main__":
         out_file = os.path.join(out_dir, 'combined_views.html')
         
         print(f"Saving all plots to {out_file}...")
-        html_content = "<html><head><title>Combined Visualizations</title></head><body>"
+        html_content = "<html><head><title>Combined Visualizations</title>"
+        html_content += "<style>body { font-family: sans-serif; margin: 40px; } .desc { margin-bottom: 20px; color: #555; }</style></head><body>"
+        html_content += "<h1>Trading Data Visualizations</h1>"
         
-        for i, fig in enumerate(figs):
+        for i, (title, desc, fig) in enumerate(figs):
             include_js = 'cdn' if i == 0 else False
+            html_content += f"<h2>{title}</h2><p class='desc'>{desc}</p>"
             html_content += fig.to_html(full_html=False, include_plotlyjs=include_js)
             
         html_content += "</body></html>"
